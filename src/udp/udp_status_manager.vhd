@@ -63,7 +63,6 @@ architecture rtl of udp_status_manager is
     signal read_state  : t_read_state;
     signal write_addr  : std_logic_vector(31 downto 0);
     signal write_data  : std_logic_vector(31 downto 0);
-    signal write_strb  : std_logic_vector(3 downto 0);
     signal bresp_reg   : std_logic_vector(1 downto 0);
     signal rdata_reg   : std_logic_vector(31 downto 0);
     signal rresp_reg   : std_logic_vector(1 downto 0);
@@ -82,21 +81,6 @@ architecture rtl of udp_status_manager is
 
     signal config_changed_reg : std_logic;
 
-    function apply_wstrb(
-        old_value : std_logic_vector(31 downto 0);
-        new_value : std_logic_vector(31 downto 0);
-        strb      : std_logic_vector(3 downto 0)
-    ) return std_logic_vector is
-        variable result : std_logic_vector(31 downto 0) := old_value;
-    begin
-        for byte_index in 0 to 3 loop
-            if strb(byte_index) = '1' then
-                result((byte_index * 8) + 7 downto byte_index * 8) :=
-                    new_value((byte_index * 8) + 7 downto byte_index * 8);
-            end if;
-        end loop;
-        return result;
-    end function;
 begin
     S_AXI_AWREADY <= '1' when write_state = W_ADDR else '0';
     S_AXI_WREADY  <= '1' when write_state = W_DATA else '0';
@@ -126,7 +110,6 @@ begin
 
     -- FSM to handle AXI-Lite Writes to registers
     write_register_process : process(axi_aclk)
-        variable merged : std_logic_vector(31 downto 0);
         variable ptr_value : t_queue_ptr;
     begin
         if rising_edge(axi_aclk) then
@@ -134,10 +117,9 @@ begin
                 write_state <= W_ADDR;
                 write_addr <= (others => '0');
                 write_data <= (others => '0');
-                write_strb <= (others => '0');
                 bresp_reg <= C_AXI_OKAY;
 
-                dma_base_reg <= (others => '0');
+                dma_base_reg <= x"00001234";
                 rx0_config_reg <= (others => '0');
                 rx1_config_reg <= (others => '0');
                 local_ip_reg <= (others => '0');
@@ -159,77 +141,68 @@ begin
 
                     when W_DATA =>
                         if S_AXI_WVALID = '1' then
+                            -- This register interface intentionally treats every
+                            -- accepted write as a full 32-bit transfer.  WSTRB is
+                            -- retained on the AXI-Lite port but is not decoded.
                             write_data <= S_AXI_WDATA;
-                            write_strb <= S_AXI_WSTRB;
                             write_state <= W_UPDATE;
                         end if;
 
                     when W_UPDATE =>
                         bresp_reg <= C_AXI_OKAY;
-                        if write_addr(1 downto 0) /= "00" or write_addr(31 downto 8) /= x"000000" then
+                        -- SmartConnect performs system-address routing.  This
+                        -- slave therefore decodes only its local byte offset.
+                        if write_addr(1 downto 0) /= "00" then
                             bresp_reg <= C_AXI_SLVERR;
                         else
                             case to_integer(unsigned(write_addr(7 downto 0))) is
                                 when C_REG_DMA_BASE_ADDR =>
-                                    merged := apply_wstrb(dma_base_reg, write_data, write_strb);
-                                    if merged(1 downto 0) = "00" and
-                                       unsigned(merged) <= unsigned'(x"FFFFC568") then
-                                        dma_base_reg <= merged;
+                                    if write_data(1 downto 0) = "00" and
+                                       unsigned(write_data) <= unsigned'(x"FFFFC568") then
+                                        dma_base_reg <= write_data;
                                     else
                                         bresp_reg <= C_AXI_SLVERR;
                                     end if;
 
                                 when C_REG_RX0_CONFIG =>
-                                    rx0_config_reg <= apply_wstrb(rx0_config_reg, write_data, write_strb);
+                                    rx0_config_reg <= write_data;
 
                                 when C_REG_RX0_HEAD =>
-                                    merged := (others => '0');
-                                    merged(2 downto 0) := rx0_head_reg;
-                                    merged := apply_wstrb(merged, write_data, write_strb);
-                                    ptr_value := merged(2 downto 0);
-                                    if merged(31 downto 3) = (merged(31 downto 3)'range => '0') and rx_ptr_valid(ptr_value) then
+                                    ptr_value := write_data(2 downto 0);
+                                    if write_data(31 downto 3) = (write_data(31 downto 3)'range => '0') and rx_ptr_valid(ptr_value) then
                                         rx0_head_reg <= ptr_value;
                                     else
                                         bresp_reg <= C_AXI_SLVERR;
                                     end if;
 
                                 when C_REG_RX1_CONFIG =>
-                                    rx1_config_reg <= apply_wstrb(rx1_config_reg, write_data, write_strb);
+                                    rx1_config_reg <= write_data;
 
                                 when C_REG_RX1_HEAD =>
-                                    merged := (others => '0');
-                                    merged(2 downto 0) := rx1_head_reg;
-                                    merged := apply_wstrb(merged, write_data, write_strb);
-                                    ptr_value := merged(2 downto 0);
-                                    if merged(31 downto 3) = (merged(31 downto 3)'range => '0') and rx_ptr_valid(ptr_value) then
+                                    ptr_value := write_data(2 downto 0);
+                                    if write_data(31 downto 3) = (write_data(31 downto 3)'range => '0') and rx_ptr_valid(ptr_value) then
                                         rx1_head_reg <= ptr_value;
                                     else
                                         bresp_reg <= C_AXI_SLVERR;
                                     end if;
 
                                 when C_REG_TX_TAIL =>
-                                    merged := (others => '0');
-                                    merged(2 downto 0) := tx_tail_reg;
-                                    merged := apply_wstrb(merged, write_data, write_strb);
-                                    if merged(31 downto 3) = (merged(31 downto 3)'range => '0') then
-                                        tx_tail_reg <= merged(2 downto 0);
+                                    if write_data(31 downto 3) = (write_data(31 downto 3)'range => '0') then
+                                        tx_tail_reg <= write_data(2 downto 0);
                                     else
                                         bresp_reg <= C_AXI_SLVERR;
                                     end if;
 
                                 when C_REG_LOCAL_IPV4 =>
-                                    merged := apply_wstrb(local_ip_reg, write_data, write_strb);
-                                    local_ip_reg <= merged;
+                                    local_ip_reg <= write_data;
                                     config_changed_reg <= '1';
 
                                 when C_REG_SUBNET_MASK =>
-                                    merged := apply_wstrb(subnet_mask_reg, write_data, write_strb);
-                                    subnet_mask_reg <= merged;
+                                    subnet_mask_reg <= write_data;
                                     config_changed_reg <= '1';
 
                                 when C_REG_DEFAULT_GATEWAY =>
-                                    merged := apply_wstrb(gateway_reg, write_data, write_strb);
-                                    gateway_reg <= merged;
+                                    gateway_reg <= write_data;
                                     config_changed_reg <= '1';
 
                                 when others =>
@@ -286,7 +259,9 @@ begin
                         if S_AXI_ARVALID = '1' then
                             rdata_reg <= (others => '0');
                             rresp_reg <= C_AXI_OKAY;
-                            if S_AXI_ARADDR(1 downto 0) /= "00" or S_AXI_ARADDR(31 downto 8) /= x"000000" then
+                            -- SmartConnect performs system-address routing.  This
+                            -- slave therefore decodes only its local byte offset.
+                            if S_AXI_ARADDR(1 downto 0) /= "00" then
                                 rresp_reg <= C_AXI_SLVERR;
                             else
                                 read_offset := to_integer(unsigned(S_AXI_ARADDR(7 downto 0)));

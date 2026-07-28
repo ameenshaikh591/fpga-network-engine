@@ -7,6 +7,7 @@ module tb_udp_engine;
     localparam logic [47:0] PEER_MAC  = 48'h02_AA_BB_CC_DD_EE;
     localparam logic [31:0] LOCAL_IP = 32'hC0A8_0164; // 192.168.1.100
     localparam logic [31:0] PEER_IP  = 32'hC0A8_0132; // 192.168.1.50
+    localparam logic [31:0] MMIO_BASE = 32'h8000_0000;
     // Places the maximum-length TX0 payload at 0x3F00 so the read engine
     // must split it at both a 4-KiB boundary and the 256-beat AXI limit.
     localparam logic [31:0] DMA_BASE = 32'h0000_1BC8;
@@ -19,6 +20,11 @@ module tb_udp_engine;
     logic crs_dv = 0;
     logic [1:0] txd;
     logic tx_en;
+    logic [3:0] dbg_tx_engine_state;
+    logic [2:0] dbg_axi_reader_state;
+    logic [1:0] dbg_arp_resolve_state;
+    logic [1:0] dbg_arp_tx_state;
+    logic [3:0] dbg_tx_mac_state;
 
     logic [31:0] s_awaddr, s_wdata, s_araddr, s_rdata;
     logic [2:0] s_awprot, s_arprot;
@@ -64,6 +70,11 @@ module tb_udp_engine;
         .i_ref_clk(ref_clk),
         .i_rxd(rxd), .i_crs_dv(crs_dv),
         .o_txd(txd), .o_tx_en(tx_en),
+        .o_dbg_tx_engine_state(dbg_tx_engine_state),
+        .o_dbg_axi_reader_state(dbg_axi_reader_state),
+        .o_dbg_arp_resolve_state(dbg_arp_resolve_state),
+        .o_dbg_arp_tx_state(dbg_arp_tx_state),
+        .o_dbg_tx_mac_state(dbg_tx_mac_state),
         .S_AXI_AWADDR(s_awaddr), .S_AXI_AWPROT(s_awprot),
         .S_AXI_AWVALID(s_awvalid), .S_AXI_AWREADY(s_awready),
         .S_AXI_WDATA(s_wdata), .S_AXI_WSTRB(s_wstrb),
@@ -203,7 +214,7 @@ module tb_udp_engine;
 
     task automatic axil_write(input logic [31:0] address, input logic [31:0] value);
         @(posedge axi_clk);
-        s_awaddr <= address;
+        s_awaddr <= MMIO_BASE + address;
         s_awvalid <= 1;
         do @(posedge axi_clk); while (!s_awready);
         s_awvalid <= 0;
@@ -220,7 +231,7 @@ module tb_udp_engine;
 
     task automatic axil_read(input logic [31:0] address, output logic [31:0] value);
         @(posedge axi_clk);
-        s_araddr <= address;
+        s_araddr <= MMIO_BASE + address;
         s_arvalid <= 1;
         do @(posedge axi_clk); while (!s_arready);
         s_arvalid <= 0;
@@ -355,6 +366,10 @@ module tb_udp_engine;
         repeat (10) @(posedge axi_clk);
         axi_resetn <= 1;
         repeat (10) @(posedge axi_clk);
+
+        axil_read(32'h00, value);
+        assert (value == 32'h0000_1234)
+            else $fatal(1, "DMA base reset value: expected 00001234 got %08x", value);
 
         axil_write(32'h00, DMA_BASE);
         axil_write(32'h24, LOCAL_IP);

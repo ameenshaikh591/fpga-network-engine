@@ -29,6 +29,8 @@ entity arp_manager is
         o_resolve_rsp_valid  : out std_logic;
         o_resolve_rsp_mac    : out std_logic_vector(47 downto 0);
         o_resolve_rsp_failed : out std_logic;
+        o_debug_resolve_state : out std_logic_vector(1 downto 0);
+        o_debug_tx_state      : out std_logic_vector(1 downto 0);
 
         o_frame_req_valid   : out std_logic;
         i_frame_req_ready   : in  std_logic;
@@ -112,6 +114,14 @@ architecture rtl of arp_manager is
         end case;
     end function;
 begin
+    -- Resolver: R_IDLE=0, R_LOOKUP=1, R_WAIT_REQUEST_SENT=2, R_WAIT_REPLY=3.
+    o_debug_resolve_state <= std_logic_vector(
+        to_unsigned(t_resolve_state'pos(resolve_state), o_debug_resolve_state'length));
+
+    -- ARP producer: ATX_IDLE=0, ATX_FRAME_REQUEST=1, ATX_STREAM=2.
+    o_debug_tx_state <= std_logic_vector(
+        to_unsigned(t_tx_state'pos(tx_state), o_debug_tx_state'length));
+
     o_resolve_req_ready <= '1' when resolve_state = R_IDLE else '0';
     o_resolve_rsp_valid <= resolve_rsp_valid_reg;
     o_resolve_rsp_mac <= resolve_rsp_mac_reg;

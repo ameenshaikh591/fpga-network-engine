@@ -16,6 +16,7 @@ entity udp_tx_engine is
         i_tx_head_ptr     : in t_queue_ptr;
         i_tx_tail_ptr     : in t_queue_ptr;
         o_tx_release_valid : out std_logic;
+        o_debug_state      : out std_logic_vector(3 downto 0);
 
         o_read_req_valid : out std_logic;
         i_read_req_ready : in  std_logic;
@@ -164,6 +165,12 @@ architecture rtl of udp_tx_engine is
         return (15 downto 0 => '0');
     end function;
 begin
+    -- T_IDLE=0, T_META_REQ=1, T_META_RECV=2, T_VALIDATE=3,
+    -- T_RESOLVE_REQ=4, T_RESOLVE_WAIT=5, T_IP_CHECKSUM=6,
+    -- T_FRAME_REQ=7, T_HEADER_STREAM=8, T_PAYLOAD_REQ=9,
+    -- T_PAYLOAD_STREAM=10, T_RELEASE=11, T_DROP=12.
+    o_debug_state <= std_logic_vector(to_unsigned(t_state'pos(state), o_debug_state'length));
+
     -- T_RELEASE and T_DROP are registered FSM states, so this is a clean
     -- one-cycle synchronous pulse.  The status manager advances TX_HEAD on
     -- the same edge that returns this engine to T_IDLE.

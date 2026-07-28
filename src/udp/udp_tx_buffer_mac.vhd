@@ -33,7 +33,8 @@ entity udp_tx_buffer_mac is
         i_frame_abort : in std_logic;
 
         o_tx_en : out std_logic;
-        o_txd   : out std_logic_vector(1 downto 0)
+        o_txd   : out std_logic_vector(1 downto 0);
+        o_debug_mac_state : out std_logic_vector(3 downto 0)
     );
 end entity;
 
@@ -99,6 +100,11 @@ architecture rtl of udp_tx_buffer_mac is
         if value = '1' then return 1; else return 0; end if;
     end function;
 begin
+    -- M_IFG=0, M_WAIT_FRAME=1, M_PREAMBLE=2, M_DEST=3, M_SOURCE=4,
+    -- M_TYPE=5, M_DATA=6, M_PADDING=7, M_FCS=8.
+    o_debug_mac_state <= std_logic_vector(
+        to_unsigned(t_mac_state'pos(mac_state), o_debug_mac_state'length));
+
     bank_write_address <= std_logic_vector(to_unsigned(fill_address, 9));
     bank_read_address <= std_logic_vector(to_unsigned(read_address, 9));
     bank_write_data <= i_frame_last & i_frame_valid_bytes & i_frame_data;

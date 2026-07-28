@@ -21,6 +21,7 @@ entity udp_axi_reader is
         o_read_last       : out std_logic;
         o_read_done       : out std_logic;
         o_read_error      : out std_logic;
+        o_debug_state     : out std_logic_vector(2 downto 0);
 
         M_AXI_ARADDR  : out std_logic_vector(31 downto 0);
         M_AXI_ARLEN   : out std_logic_vector(7 downto 0);
@@ -92,6 +93,10 @@ architecture rtl of udp_axi_reader is
         return result;
     end function;
 begin
+    -- R_IDLE=0, R_AR=1, R_DATA=2, R_WAIT_OUTPUT=3,
+    -- R_DRAIN=4, R_DONE=5, R_ERROR=6.
+    o_debug_state <= std_logic_vector(to_unsigned(t_state'pos(state), o_debug_state'length));
+
     o_read_req_ready <= '1' when state = R_IDLE else '0';
     o_read_data_valid <= output_valid_reg;
     o_read_data <= output_data_reg;

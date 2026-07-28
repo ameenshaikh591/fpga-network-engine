@@ -25,6 +25,13 @@ entity udp_engine is
         o_txd         : out std_logic_vector(1 downto 0);
         o_tx_en       : out std_logic;
 
+        -- Five ILA-friendly probes covering the complete UDP/ARP TX path.
+        o_dbg_tx_engine_state  : out std_logic_vector(3 downto 0);
+        o_dbg_axi_reader_state : out std_logic_vector(2 downto 0);
+        o_dbg_arp_resolve_state : out std_logic_vector(1 downto 0);
+        o_dbg_arp_tx_state     : out std_logic_vector(1 downto 0);
+        o_dbg_tx_mac_state     : out std_logic_vector(3 downto 0);
+
         -- AXI4-Lite control slave
         S_AXI_AWADDR  : in  std_logic_vector(31 downto 0);
         S_AXI_AWPROT  : in  std_logic_vector(2 downto 0);
@@ -138,6 +145,13 @@ architecture rtl of udp_engine is
 
     signal i_rmii_resetn : std_logic;
     signal i_rxer        : std_logic;
+
+    attribute mark_debug : string;
+    attribute mark_debug of o_dbg_tx_engine_state : signal is "true";
+    attribute mark_debug of o_dbg_axi_reader_state : signal is "true";
+    attribute mark_debug of o_dbg_arp_resolve_state : signal is "true";
+    attribute mark_debug of o_dbg_arp_tx_state : signal is "true";
+    attribute mark_debug of o_dbg_tx_mac_state : signal is "true";
 begin
 
     process(i_ref_clk) is
@@ -265,6 +279,7 @@ begin
             o_read_data_valid => read_data_valid, i_read_data_ready => read_data_ready,
             o_read_data => read_data, o_read_valid_bytes => read_valid_bytes,
             o_read_last => read_last, o_read_done => read_done, o_read_error => read_error,
+            o_debug_state => o_dbg_axi_reader_state,
             M_AXI_ARADDR => M_AXI_RD_ARADDR, M_AXI_ARLEN => M_AXI_RD_ARLEN,
             M_AXI_ARSIZE => M_AXI_RD_ARSIZE, M_AXI_ARBURST => M_AXI_RD_ARBURST,
             M_AXI_ARPROT => M_AXI_RD_ARPROT, M_AXI_ARVALID => M_AXI_RD_ARVALID,
@@ -290,6 +305,8 @@ begin
             i_resolve_req_valid => resolve_req_valid, o_resolve_req_ready => resolve_req_ready,
             i_resolve_ip => resolve_ip, o_resolve_rsp_valid => resolve_rsp_valid,
             o_resolve_rsp_mac => resolve_mac, o_resolve_rsp_failed => resolve_rsp_failed,
+            o_debug_resolve_state => o_dbg_arp_resolve_state,
+            o_debug_tx_state => o_dbg_arp_tx_state,
             o_frame_req_valid => arp_req_valid, i_frame_req_ready => arp_req_ready,
             o_frame_dest_mac => arp_dest_mac, o_frame_ethertype => arp_ethertype,
             o_frame_payload_length => arp_length, o_frame_data_valid => arp_data_valid,
@@ -305,6 +322,7 @@ begin
             i_subnet_mask => subnet_mask, i_default_gateway => gateway,
             i_tx_head_ptr => tx_head, i_tx_tail_ptr => tx_tail,
             o_tx_release_valid => tx_release_valid,
+            o_debug_state => o_dbg_tx_engine_state,
             o_read_req_valid => read_req_valid, i_read_req_ready => read_req_ready,
             o_read_addr => read_addr, o_read_length => read_length,
             i_read_data_valid => read_data_valid, o_read_data_ready => read_data_ready,
@@ -352,6 +370,7 @@ begin
             i_frame_length => frame_length, i_frame_data_valid => frame_data_valid,
             o_frame_data_ready => frame_data_ready, i_frame_data => frame_data,
             i_frame_valid_bytes => frame_valid_bytes, i_frame_last => frame_last,
-            i_frame_abort => frame_abort, o_tx_en => o_tx_en, o_txd => o_txd
+            i_frame_abort => frame_abort, o_tx_en => o_tx_en, o_txd => o_txd,
+            o_debug_mac_state => o_dbg_tx_mac_state
         );
 end architecture;
