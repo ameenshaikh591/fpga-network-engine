@@ -27,3 +27,6 @@ questasim/
 transcript
 vsim.wlf
 modelsim.ini
+
+# Local notes
+plan.txt
