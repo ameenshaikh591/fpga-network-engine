@@ -1,6 +1,6 @@
-# FPGA IP/UDP Network Engine
+# FPGA IPv4/UDP Network Engine
 
-This project is a hardware IPv4/UDP endpoint intended for FPGA designs using an RMII Ethernet PHY. Software provides UDP payloads and packet metadata, which are received by the IPv4/UDP Network Engine. The hardware handles next-hop MAC resolution (including generating ARP requests if needed), IPv4/UDP header generation, Ethernet framing, and transmission.
+This project is a hardware IPv4/UDP network engine intended for FPGA designs using an RMII Ethernet PHY. Software provides UDP payloads and packet metadata, which are received by the IPv4/UDP Network Engine. The hardware handles next-hop MAC resolution (including generating ARP requests if needed), IPv4/UDP header generation, Ethernet framing, and transmission.
 
 A shared memory region exists between the processor and the IPv4/UDP Network Engine. This shared memory region contains a TX circular queue, as well as two RX circular queues (one for each local socket). More information on the shared memory region/circular queue functionality is described in 'Hardware/Software Queue Model'.
 
