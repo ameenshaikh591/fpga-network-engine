@@ -22,7 +22,7 @@ On receive, the RMII MAC removes the preamble and FCS and pushes the Ethernet fr
 
 - 100 Mb/s RMII interface operating from a 50 MHz PHY reference clock
 - AXI4-Lite control/status interface
-- Independent AXI4 burst read and write masters
+- Independent AXI4 read and write masters
 - Automatic ARP request and reply generation
 - Four-entry ARP cache with round-robin replacement
 - IPv4 header checksum generation and verification
@@ -34,7 +34,9 @@ On receive, the RMII MAC removes the preamble and FCS and pushes the Ethernet fr
 - Two complete-frame TX banks between the AXI and RMII clock domains
 - Ethernet preamble, padding, FCS, and interpacket-gap generation
 
-Receive latency will be added soon.
+## YouTube Demo
+
+Coming soon
 
 ## Hardware/Software Queue Model
 
@@ -103,26 +105,29 @@ The `sim` directory contains:
 
 - `tb_udp_axi_reader.sv` for AXI burst splitting, 4 KiB boundary handling, and reader buffering
 - `tb_udp_engine.sv` for ARP miss/reply, UDP transmit, UDP receive, IPv4 checksum, and DMA traffic
-- `synth_check.tcl` for a basic Vivado RTL synthesis check
 
-The transmit path has also been implemented on hardware and verified with Wireshark using a MicroBlaze application and a directly connected PC.
+The transmit and receive paths have also been tested on hardware and verified using a MicroBlaze application and a directly connected PC.
 
 ## Latency
 
-All latency values in this section are reported in AXI/protocol clock cycles. The transmit measurement begins with the AXI4-Lite transaction that publishes a completed TX entry and ends when the hardware increments `TX_HEAD` and returns the TX engine to idle.
-
-The calculation does not include the software payload copy, cache maintenance, TX-bank clock-domain crossing, Ethernet interpacket gap, or RMII frame serialization.
+All latency values in this section are reported in AXI/system clock cycles.
 
 ### Transmit Latency
 
+The transmit latency measurement begins when the processor starts the AXI4-Lite transaction that updates `TX_TAIL` and ends when hardware increments `TX_HEAD` and returns the TX Engine to idle. Incrementing `TX_HEAD` also frees another TX queue entry, allowing software to push another packet for transmission.
+
+Transmit latency depends on whether the ARP Manager already has the packet's next-hop IP-to-MAC mapping. On a cache miss, an ARP request must be transmitted and the reply must be received and decoded before UDP transmission can continue. This makes the total latency dependent on the network and the remote host's response time.
+
 #### ARP Cache Hit
 
-The cached transmit latency assumes:
+The ARP-cache-hit transmit latency assumes:
 
 - A 100 MHz AXI/system clock
-- No AXI backpressure or additional memory-response delay
-- At least one available TX Stream Buffer
-- A nonzero payload length
+- AXI address requests are accepted immediately and the memory controller sustains one 32-bit read beat per cycle
+- The TX Frame Arbiter is idle and at least one TX Stream Buffer is available
+- The payload read fits within one AXI burst
+- The payload length is nonzero
+- The IPv4 destination address's next-hop MAC address is cached by the ARP Manager
 
 | Operation | Latency |
 | --- | ---: |
@@ -134,13 +139,50 @@ The cached transmit latency assumes:
 | Buffer the IPv4/UDP header and payload | `11 + ceil(payload_bytes / 4)` cycles |
 | Release the TX entry, increment `TX_HEAD`, and return to idle | 1 cycle |
 
-L<sub>total</sub> = `37 + ceil(payload / 4)`
+L<sub>total</sub> = `37 + ceil(payload_bytes / 4)` cycles
 
-Once software begins the AXI4-Lite transaction that updates `TX_TAIL`, it takes L<sub>total</sub> cycles for hardware to increment `TX_HEAD` and prepare the TX engine to transmit another packet.
+At 100 MHz, one AXI/system clock cycle is 10 ns:
+
+t<sub>total</sub> = `370 ns + 10 ns * ceil(payload_bytes / 4)`
+
+A zero-length payload skips the payload-read states and takes 34 cycles, or 340 ns at 100 MHz.
+
+The AXI reader splits payload reads at 256-beat and 4 KiB boundaries. Under the same assumptions, each additional payload burst adds at least one AXI/system clock cycle.
+
+Once software begins the AXI4-Lite transaction that updates `TX_TAIL`, it takes L<sub>total</sub> cycles for hardware to increment `TX_HEAD` and prepare the TX Engine to handle another packet.
 
 ### Receive Latency
 
-Receive latency will be added soon.
+Coming soon
+
+## Resources and Timing
+
+### Resource Utilization
+
+The IPv4/UDP Network Engine was synthesized with Vivado 2026.1 for the Basys 3 FPGA development board.
+
+The resource utilization based on synthesis results is as follows:
+
+| Resource | Utilization |
+| --- | ---: |
+| LUTs | 2,672 |
+| Flip-flops | 2,858 |
+| Block RAM | 1 x 36 Kib + 2 x 18 Kib (9 KiB total) |
+
+### Timing
+
+The IPv4/UDP Network Engine was implemented with Vivado 2026.1 for the Basys 3.
+
+The Basys 3 does not include an onboard Ethernet PHY. For hardware testing, I connected a LAN8720 RMII PHY module to the Pmod headers with one-inch jumper wires. This is not recommended for a final design because signal integrity is not guaranteed. The RMII pin assignments and PHY timing constraints are in [`constraints/basys3.xdc`](constraints/basys3.xdc).
+
+After implementation, the timing results were:
+
+| Timing check | Slack |
+| --- | ---: |
+| Worst negative slack (WNS) | +0.402 ns |
+| Worst hold slack (WHS) | +0.022 ns |
+
+Both values are positive, so the design met setup and hold timing for the constrained paths.
 
 ## Current Limitations
 
@@ -156,7 +198,7 @@ Receive latency will be added soon.
 
 ```text
 src/              VHDL RTL
-sim/              SystemVerilog testbenches and simulation scripts
+sim/              SystemVerilog testbenches
 sw/microblaze/    MicroBlaze UDP API and example application
 sw/pc/            PC-side UDP test script
 ```
