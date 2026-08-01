@@ -34,6 +34,56 @@ On receive, the RMII MAC removes the preamble and FCS and pushes the Ethernet fr
 - Two complete-frame TX banks between the AXI and RMII clock domains
 - Ethernet preamble, padding, FCS, and interpacket-gap generation
 
+## Latency
+
+All latency values in this section are reported in AXI/protocol clock cycles. The transmit measurement begins with the AXI4-Lite transaction that publishes a completed TX entry and ends when the hardware increments `TX_HEAD` and returns the TX engine to idle.
+
+The calculation does not include the software payload copy, cache maintenance, TX-bank clock-domain crossing, Ethernet interpacket gap, or RMII frame serialization.
+
+### Transmit Latency
+
+#### ARP Cache Hit
+
+The minimum cached transmit latency assumes:
+
+- A 100 MHz AXI/protocol clock
+- No AXI backpressure or additional memory-response delay
+- An idle frame arbiter and an immediately available TX frame bank
+- A payload read that fits within one AXI burst
+- A nonzero payload length
+
+| Operation | Latency |
+| --- | ---: |
+| AXI4-Lite TX tail update | 3 cycles |
+| Detect the new TX queue entry | 1 cycle |
+| Read, store, and validate the TX metadata | 8 cycles |
+| Request and receive the cached next-hop MAC address | 3 cycles |
+| Generate the IPv4 header checksum | 10 cycles |
+| Buffer the IPv4/UDP header and payload | `11 + ceil(payload_bytes / 4)` cycles |
+| Release the TX entry, increment `TX_HEAD`, and return to idle | 1 cycle |
+
+For a nonzero payload contained within one AXI burst:
+
+```text
+L_TX = 37 + ceil(payload_bytes / 4) AXI clock cycles
+```
+
+At 100 MHz:
+
+```text
+t_TX = 370 ns + 10 ns * ceil(payload_bytes / 4)
+```
+
+A zero-length payload skips the payload read states and takes 34 cycles, or 340 ns at 100 MHz.
+
+The AXI reader splits requests at 256 beats and 4 KiB address boundaries. Under the same continuous-ready assumptions, add one cycle for each additional payload burst.
+
+ARP-cache-miss latency will be reported separately because it also depends on RMII transmission, the remote host's response time, and receive-path processing.
+
+### Receive Latency
+
+Receive latency will be added after the receive path is characterized.
+
 ## Hardware/Software Queue Model
 
 Software owns the RX head pointers and TX tail pointer. Hardware owns the RX tail pointers and TX head pointer.
