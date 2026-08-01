@@ -20,12 +20,6 @@ module tb_udp_engine;
     logic crs_dv = 0;
     logic [1:0] txd;
     logic tx_en;
-    logic [3:0] dbg_tx_engine_state;
-    logic [2:0] dbg_axi_reader_state;
-    logic [1:0] dbg_arp_resolve_state;
-    logic [1:0] dbg_arp_tx_state;
-    logic [3:0] dbg_tx_mac_state;
-
     logic [31:0] s_awaddr, s_wdata, s_araddr, s_rdata;
     logic [2:0] s_awprot, s_arprot;
     logic [3:0] s_wstrb;
@@ -70,11 +64,6 @@ module tb_udp_engine;
         .i_ref_clk(ref_clk),
         .i_rxd(rxd), .i_crs_dv(crs_dv),
         .o_txd(txd), .o_tx_en(tx_en),
-        .o_dbg_tx_engine_state(dbg_tx_engine_state),
-        .o_dbg_axi_reader_state(dbg_axi_reader_state),
-        .o_dbg_arp_resolve_state(dbg_arp_resolve_state),
-        .o_dbg_arp_tx_state(dbg_arp_tx_state),
-        .o_dbg_tx_mac_state(dbg_tx_mac_state),
         .S_AXI_AWADDR(s_awaddr), .S_AXI_AWPROT(s_awprot),
         .S_AXI_AWVALID(s_awvalid), .S_AXI_AWREADY(s_awready),
         .S_AXI_WDATA(s_wdata), .S_AXI_WSTRB(s_wstrb),
