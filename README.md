@@ -1,24 +1,26 @@
 # FPGA IP/UDP Network Engine
 
-This project is a small hardware IPv4/UDP endpoint intended for FPGA designs using an RMII Ethernet PHY. Software provides UDP payloads and packet metadata through a shared DMA region; the hardware handles ARP resolution, IPv4/UDP header generation, Ethernet framing, and transmission.
+This project is a hardware IPv4/UDP endpoint intended for FPGA designs using an RMII Ethernet PHY. Software provides UDP payloads and packet metadata, which are received by the IPv4/UDP Network Engine. The hardware handles next-hop MAC resolution (including generating ARP requests if needed), IPv4/UDP header generation, Ethernet framing, and transmission.
 
-The receive path performs the reverse operation. Ethernet frames are checked and parsed in hardware, UDP payloads are written into socket-specific DMA queues, and software is notified through the queue head/tail registers.
+A shared memory region exists between the processor and the IPv4/UDP Network Engine. This shared memory region contains a TX circular queue, as well as two RX circular queues (one for each local socket). More information on the shared memory region/circular queue functionality is described in 'Hardware/Software Queue Model'.
 
-The goal is not to implement a general-purpose network stack. It is a bounded UDP engine with a straightforward hardware/software ownership model that is practical to integrate with a MicroBlaze system.
+The receive path of the IPv4/UDP Network Engine checks and parses incoming Ethernet frames. Valid UDP payloads are written into socket-specific RX queues, and software is notified by incrementing the RX queue's tail register.
 
-## High-level architecture
+## High Level Architecture
 
 ![FPGA UDP/IP network engine architecture](docs/high_level_arch.jpg)
 
-The AXI4-Lite status manager holds the network configuration and queue pointers. Packet data is stored in a shared memory region accessed by independent AXI4 read and write masters.
+The AXI4-Lite status manager holds the configuration registers and TX/RX queue pointers. 
+
+Packet data is stored in a shared memory region between the processor and the IPv4/UDP Network Engine. The network engine accesses this shared memory region using custom AXI DMA write/read engines. 
 
 On transmit, the UDP TX engine reads a queued descriptor, resolves the next-hop MAC address through the ARP manager, and submits the IPv4/UDP stream to the TX frame arbiter. ARP and UDP frames share the same dual-clock TX buffer and RMII MAC.
 
-On receive, the RMII MAC removes the preamble and FCS and pushes the Ethernet frame into an asynchronous FIFO. The UDP RX engine then parses ARP, IPv4, and UDP traffic. Valid UDP payloads are written to the selected receive queue through the AXI writer.
+On receive, the RMII MAC removes the preamble and FCS and pushes the Ethernet frame into an asynchronous FIFO. The UDP RX engine then parses ARP, IPv4, and UDP traffic. Valid UDP payloads are written to the appropriate RX queue based on the destination UDP port.
 
 ## Features
 
-- 10/100 RMII interface operating from a 50 MHz PHY reference clock
+- 100 Mb/s RMII interface operating from a 50 MHz PHY reference clock
 - AXI4-Lite control/status interface
 - Independent AXI4 burst read and write masters
 - Automatic ARP request and reply generation
@@ -31,9 +33,8 @@ On receive, the RMII MAC removes the preamble and FCS and pushes the Ethernet fr
 - Subnet-aware next-hop selection with optional default gateway
 - Two complete-frame TX banks between the AXI and RMII clock domains
 - Ethernet preamble, padding, FCS, and interpacket-gap generation
-- Five exposed state probes for ILA debugging
 
-## Hardware/software queue model
+## Hardware/Software Queue Model
 
 Software owns the RX head pointers and TX tail pointer. Hardware owns the RX tail pointers and TX head pointer.
 
@@ -51,7 +52,7 @@ The DMA region occupies 15,000 bytes:
 
 Each entry is 1500 bytes. The first 16 bytes contain metadata, followed by up to 1472 bytes of UDP payload.
 
-## MicroBlaze software
+## MicroBlaze Software
 
 The driver in [`sw/microblaze`](sw/microblaze) exposes a small polling-based API:
 
@@ -78,9 +79,9 @@ See [`sw/microblaze/main.c`](sw/microblaze/main.c) for a minimal transmit exampl
 
 If the MicroBlaze data cache is enabled, the DMA packet region must either be uncached or the cache maintenance hooks in `udp_api.c` must be connected to the BSP cache functions.
 
-## Vivado integration
+## Vivado Integration
 
-<!-- Add the Vivado block-design capture here. -->
+![Vivado Block Diagram](docs/vivado_bd.png)
 
 The top-level entity is [`src/udp_engine.vhd`](src/udp_engine.vhd). A typical design connects:
 
@@ -103,7 +104,7 @@ The `sim` directory contains:
 
 The transmit path has also been implemented on hardware and verified with Wireshark using a MicroBlaze application and a directly connected PC.
 
-## Current limitations
+## Current Limitations
 
 - IPv4 and Ethernet II only
 - No VLAN support
@@ -113,9 +114,7 @@ The transmit path has also been implemented on hardware and verified with Wiresh
 - One outstanding ARP resolution at a time
 - Two receive sockets and one in-order transmit queue
 
-These constraints are intentional and keep the design small and deterministic.
-
-## Repository layout
+## Repository Layout
 
 ```text
 src/              VHDL RTL
