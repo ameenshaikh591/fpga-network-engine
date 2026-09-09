@@ -1,10 +1,13 @@
 # FPGA IP/UDP Network Engine
 
-This project is a hardware IPv4/UDP endpoint intended for FPGA designs using an RMII Ethernet PHY. Software provides UDP payloads and packet metadata, which are received by the IPv4/UDP Network Engine. The hardware handles next-hop MAC resolution (including generating ARP requests if needed), IPv4/UDP header generation, Ethernet framing, and transmission.
+This project is a hardware IPv4/UDP Network Engine intended for FPGA designs using an RMII Ethernet PHY. 
+This network engine has been designed based on the idea that a processor (like MicroBlaze) is the primary user of the network engine.
 
 A shared memory region exists between the processor and the IPv4/UDP Network Engine. This shared memory region contains a TX circular queue, as well as two RX circular queues (one for each local socket). More information on the shared memory region/circular queue functionality is described in 'Hardware/Software Queue Model'.
 
-The receive path of the IPv4/UDP Network Engine checks and parses incoming Ethernet frames. Valid UDP payloads are written into socket-specific RX queues, and software is notified by incrementing the RX queue's tail register.
+The processor provides UDP packets to transmit by pushing them into the TX circular queue. Afterwards, the hardware handles next-hop MAC resolution (including generating ARP requests if needed), IPv4/UDP header generation, Ethernet framing, and transmission.
+
+The receive path of the IPv4/UDP Network Engine checks and parses incoming Ethernet frames. Valid UDP payloads are written into socket-specific RX queues, and the processor is notified by incrementing the RX queue's tail register.
 
 ## High Level Architecture
 
@@ -120,7 +123,7 @@ Transmit latency depends on whether the ARP Manager already has the packet's nex
 
 #### ARP Cache Hit
 
-The ARP-cache-hit transmit latency assumes:
+The ARP-cache-hit transmit latency measurement assumes:
 
 - A 100 MHz AXI/system clock
 - AXI address requests are accepted immediately and the memory controller sustains one 32-bit read beat per cycle
@@ -153,7 +156,24 @@ Once software begins the AXI4-Lite transaction that updates `TX_TAIL`, it takes 
 
 ### Receive Latency
 
-Coming soon
+The receive latency measurement begins when the PHY begins to drive the RMII, indicating an incoming Ethernet frame and ends when the appropriate
+`RX*_TAIL` is incremented. Incrementing `RX*_TAIL` notifies the software/processor that a UDP packet has been received.
+
+The receive latency measurement assumes:
+
+- A 100 MHz AXI/system clock
+- AXI address requests are accepted immediately and the memory controller sustains one 32-bit read beat per cycle
+- The payload length is nonzero
+
+| Operation | Latency |
+| --- | ---: |
+| AXI4-Lite TX tail update | 3 cycles |
+| Detect the new TX queue entry | 1 cycle |
+| Read, store, and validate the TX metadata | 8 cycles |
+| Request and receive the cached next-hop MAC address | 3 cycles |
+| Generate the IPv4 header checksum | 10 cycles |
+| Buffer the IPv4/UDP header and payload | `11 + ceil(payload_bytes / 4)` cycles |
+| Release the TX entry, increment `TX_HEAD`, and return to idle | 1 cycle |
 
 ## Resources and Timing
 
@@ -167,7 +187,7 @@ The resource utilization based on synthesis results is as follows:
 | --- | ---: |
 | LUTs | 2,672 |
 | Flip-flops | 2,858 |
-| Block RAM | 1 x 36 Kib + 2 x 18 Kib (9 KiB total) |
+| Block RAM | 9 KiB |
 
 ### Timing
 
@@ -177,12 +197,12 @@ The Basys 3 does not include an onboard Ethernet PHY. For hardware testing, I co
 
 After implementation, the timing results were:
 
-| Timing check | Slack |
+| Timing Check | Slack |
 | --- | ---: |
-| Worst negative slack (WNS) | +0.402 ns |
-| Worst hold slack (WHS) | +0.022 ns |
+| Worst Negative Slack (WNS) | +0.402 ns |
+| Worst Hold Slack (WHS) | +0.022 ns |
 
-Both values are positive, so the design met setup and hold timing for the constrained paths.
+Both WNS and WHS values are positive, so the design met setup and hold timing for the constrained paths.
 
 ## Current Limitations
 

@@ -287,7 +287,7 @@ begin
                             end if;
 
                         when RX_DISPATCH =>
-                            state <= RX_DROP; -- unreachable defensive state
+                            state <= RX_DROP; 
 
                         when RX_ARP_BODY =>
                             if fifo_take = '1' then
