@@ -34,17 +34,32 @@ enum {
     UDP_ERR_BUFFER_TOO_SMALL = -5
 };
 
-/* Optional when UDP_ENGINE_MMIO_BASE is supplied by the BSP/build system. */
+/*
+* The user provides the MMIO base address of the 'fpga_network_engine' peripheral
+* mmio_base: The base address of the 'fpga_network_engine' peripheral
+*/
 void udp_set_mmio_base(uintptr_t mmio_base);
 
+/*
+* Provide the base address of the TX/RX queues memory region, the local IPv4 address, the subnet mask,
+* and the default gateway.
+
+* The 'fpga_network_engine' will be passed this information by setting particular registers in its address space.
+
+* config: A struct that has fields for all the above information 
+
+* Need to handle the improper condition where 'udp_init()' is called before 'udp_set_mmio_base()'
+*/
 int udp_init(const udp_config_t *config);
+
 udp_socket_t udp_socket_open(uint16_t local_port);
+
 int udp_socket_close(udp_socket_t socket);
-int udp_send(udp_socket_t socket, const void *payload,
-             uint16_t payload_length, uint32_t destination_ip,
-             uint16_t destination_port);
-int udp_recv(udp_socket_t socket, void *payload,
-             uint16_t payload_capacity, udp_info_t *info);
+
+int udp_send(udp_socket_t socket, const void *payload, uint16_t payload_length, uint32_t destination_ip,
+    uint16_t destination_port);
+
+int udp_recv(udp_socket_t socket, void *payload, uint16_t payload_capacity, udp_info_t *info);
 
 #ifdef __cplusplus
 }
