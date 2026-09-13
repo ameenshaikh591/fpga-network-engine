@@ -1,21 +1,21 @@
-# FPGA IP/UDP Network Engine
+# UDP Engine
 
-This project is a hardware IPv4/UDP Network Engine intended for FPGA designs using an RMII Ethernet PHY. 
-This network engine has been designed based on the idea that a processor (like MicroBlaze) is the primary user of the network engine.
+This project is a hardware UDP Engine intended for FPGA designs using an RMII Ethernet PHY.
+This UDP Engine has been designed based on the idea that a processor (like MicroBlaze) is the primary user of the UDP Engine.
 
-A shared memory region exists between the processor and the IPv4/UDP Network Engine. This shared memory region contains a TX circular queue, as well as two RX circular queues (one for each local socket). More information on the shared memory region/circular queue functionality is described in 'Hardware/Software Queue Model'.
+A shared memory region exists between the processor and the UDP Engine. This shared memory region contains a TX circular queue, as well as two RX circular queues (one for each local socket). More information on the shared memory region/circular queue functionality is described in 'Hardware/Software Queue Model'.
 
 The processor provides UDP packets to transmit by pushing them into the TX circular queue. Afterwards, the hardware handles next-hop MAC resolution (including generating ARP requests if needed), IPv4/UDP header generation, Ethernet framing, and transmission.
 
-The receive path of the IPv4/UDP Network Engine checks and parses incoming Ethernet frames. Valid UDP payloads are written into socket-specific RX queues, and the processor is notified by incrementing the RX queue's tail register.
+The receive path of the UDP Engine checks and parses incoming Ethernet frames. Valid UDP payloads are written into socket-specific RX queues, and the processor is notified by incrementing the RX queue's tail register.
 
 ## High Level Architecture
 
-![FPGA UDP/IP network engine architecture](docs/high_level_arch.jpg)
+![UDP Engine architecture](docs/high_level_arch.jpg)
 
 The AXI4-Lite status manager holds the configuration registers and TX/RX queue pointers. 
 
-Packet data is stored in a shared memory region between the processor and the IPv4/UDP Network Engine. The network engine accesses this shared memory region using custom AXI DMA write/read engines. 
+Packet data is stored in a shared memory region between the processor and the UDP Engine. The UDP Engine accesses this shared memory region using custom AXI DMA write/read engines.
 
 On transmit, the UDP TX engine reads a queued descriptor, resolves the next-hop MAC address through the ARP manager, and submits the IPv4/UDP stream to the TX frame arbiter. ARP and UDP frames share the same dual-clock TX buffer and RMII MAC.
 
@@ -179,7 +179,7 @@ The receive latency measurement assumes:
 
 ### Resource Utilization
 
-The IPv4/UDP Network Engine was synthesized with Vivado 2026.1 for the Basys 3 FPGA development board.
+The UDP Engine was synthesized with Vivado 2026.1 for the Basys 3 FPGA development board.
 
 The resource utilization based on synthesis results is as follows:
 
@@ -191,7 +191,7 @@ The resource utilization based on synthesis results is as follows:
 
 ### Timing
 
-The IPv4/UDP Network Engine was implemented with Vivado 2026.1 for the Basys 3.
+The UDP Engine was implemented with Vivado 2026.1 for the Basys 3.
 
 The Basys 3 does not include an onboard Ethernet PHY. For hardware testing, I connected a LAN8720 RMII PHY module to the Pmod headers with one-inch jumper wires. This is not recommended for a final design because signal integrity is not guaranteed. The RMII pin assignments and PHY timing constraints are in [`constraints/basys3.xdc`](constraints/basys3.xdc).
 

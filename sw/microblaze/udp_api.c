@@ -2,7 +2,7 @@
 #include <stddef.h>
 
 /*
-Memory Map of 'fpga_network_engine':
+Memory Map of 'UDP Engine':
 
 
 0x0 | TX/RX Queue Base Addr | R/W | Base address of the TX/RX queue memory region
@@ -40,7 +40,7 @@ Memory Map of 'fpga_network_engine':
 #define SUBNET_MASK_OFFSET          0x28
 #define GATEWAY_OFFSET              0x2C
 
-#define QUEUE_MEM_SIZE 
+#define QUEUE_MEM_SIZE              15000
 
 static uintptr_t UDP_ENGINE_MMIO_BASE = -1;
 static uintptr_t QUEUE_BASE_ADDR;
@@ -55,17 +55,17 @@ void udp_set_mmio_base(uintptr_t mmio_base) {
 * Provide the base address of the TX/RX queues memory region, the local IPv4 address, the subnet mask,
 * and the default gateway
 
-* The 'fpga_network_engine' will be passed this information by setting particular registers in its address space.
+* The 'UDP Engine' will be passed this information by setting particular registers in its address space.
 
 * config: A struct that has fields for all the above information 
 */
 int udp_init(const udp_config_t *config) {
-    if (config == NULLPTR) {
+    if (config == NULL) {
         return UDP_ERR_ARGUMENT;
     }
 
-    // UDP Engine MMIO base address not provided
-    if (UDP_ENGINE_MMIO_BASE = -1) {
+    // Verify UDP Engine MMIO base address not provided
+    if (UDP_ENGINE_MMIO_BASE == -1) {
         return UDP_ERR_ARGUMENT;
     }
 
@@ -74,7 +74,10 @@ int udp_init(const udp_config_t *config) {
         return UDP_ERR_ARGUMENT;
     }
 
-    if ((config->queue_base_addr + ))
+
+    if ((0xFFFFFFFFu - QUEUE_MEM_SIZE + 1) < config->queue_base_addr) {
+        return UDP_ERR_ARGUMENT;
+    }
 
     volatile uint32_t* QUEUE_BASE_ADDR = (volatile uint32_t*)(UDP_ENGINE_MMIO_BASE + QUEUE_BASE_ADDR_OFFSET);
     *QUEUE_BASE_ADDR = config->queue_base_addr;
@@ -91,4 +94,8 @@ int udp_init(const udp_config_t *config) {
 
     UDP_ENGINE_INITIALIZED = 1;
     return UDP_OK;
+}
+
+udp_socket_t udp_socket_open(uint16_t local_port) {
+
 }

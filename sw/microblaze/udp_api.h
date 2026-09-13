@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 /*
-Memory Map of 'fpga_network_engine':
+Memory Map of UDP Engine:
 
 
 0x0 | Queue Base Addr | R/W | Base address of the TX/RX queue memory region
@@ -66,8 +66,8 @@ enum {
 };
 
 /*
-* The user provides the MMIO base address of the 'fpga_network_engine' peripheral
-* mmio_base: The base address of the 'fpga_network_engine' peripheral
+* The user provides the MMIO base address of the UDP Engine peripheral
+* mmio_base: The base address of the UDP Engine peripheral
 */
 void udp_set_mmio_base(uintptr_t mmio_base);
 
@@ -75,7 +75,7 @@ void udp_set_mmio_base(uintptr_t mmio_base);
 * Provide the base address of the TX/RX queues memory region, the local IPv4 address, the subnet mask,
 * and the default gateway.
 
-* The 'fpga_network_engine' will be passed this information by setting particular registers in its address space.
+* The UDP Engine will be passed this information by setting particular registers in its address space.
 
 * config: A struct that has fields for all the above information 
 
