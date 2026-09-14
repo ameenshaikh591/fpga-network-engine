@@ -163,3 +163,36 @@ udp_socket_t udp_socket_open(uint16_t local_port) {
         return 1;
     }
 }
+
+/*
+* Close an established UDP socket, freeing up an RX queue
+*/
+int udp_socket_close(udp_socket_t socket) {
+    if (socket > 1 || socket < 0) {
+        return UDP_ERR_ARGUMENT;
+    }
+
+    if (initialized == 0) {
+        return UDP_ERR_NOT_INITIALIZED;
+    }
+
+    volatile uint32_t* rx_config_reg;
+    volatile uint32_t* rx_head_reg;
+    volatile uint32_t* rx_tail_reg;
+
+    if (socket == 0) {
+        rx_config_reg = (volatile uint32_t*)(mmio_base + RX0_CONFIG_OFFSET);
+        rx_head_reg = (volatile uint32_t*)(mmio_base + RX0_HEAD_OFFSET);
+        rx_tail_reg = (volatile uint32_t*)(mmio_base + RX0_TAIL_OFFSET);
+    } else {
+        rx_config_reg = (volatile uint32_t*)(mmio_base + RX1_CONFIG_OFFSET);
+        rx_head_reg = (volatile uint32_t*)(mmio_base + RX1_HEAD_OFFSET);
+        rx_tail_reg = (volatile uint32_t*)(mmio_base + RX1_TAIL_OFFSET);
+    }
+
+    *rx_config_reg = 0x00000000u;
+
+    uint8_t rx_tail = (uint8_t)(*rx_tail_reg);
+    *rx_head_reg = rx_tail;
+    return UDP_OK;
+}
